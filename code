@@ -1,0 +1,111 @@
+#include <stddef.h>
+#include <Arduino.h>
+#include <Wire.h>
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+#include <stddef.h>
+#include <TensorFlowLite.h> // Correct library name
+
+
+// Initialize the LCD (LCD1602 connected to pins as described)
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+// Initialize SoftwareSerial for communication with ESP32
+SoftwareSerial espSerial(10, 11); // RX, TX pins
+
+// Define LED pin
+const int ledPin = 9;
+
+// Set your face ID (this should be the ID recognized by the ESP32)
+const int MY_FACE_ID = 1;
+
+// Define classes for modularity and clarity
+class LED {
+public:
+    void approvedSignal() {
+        // Turn off LED
+        digitalWrite(ledPin, LOW);
+    }
+
+    void alarmSignal() {
+        // Turn on LED
+        digitalWrite(ledPin, HIGH);
+        delay(1000);
+        digitalWrite(ledPin, LOW);
+        delay(1000);
+    }
+};
+
+class Display {
+public:
+    void showScanning() {
+        // Display scanning message
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Scanning...");
+    }
+
+    void showAccessGranted() {
+        // Display access granted message
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Access Granted");
+        lcd.setCursor(0, 1);
+        lcd.print("Welcome!");
+    }
+
+    void showAccessDenied() {
+        // Display access denied message
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Access Denied");
+    }
+};
+
+class FacialRecognition {
+public:
+    void processFace(int faceID, Display &display, LED &led) {
+        if (faceID == MY_FACE_ID) {
+            // Face recognized
+            display.showAccessGranted();
+            led.approvedSignal();
+        } else if (faceID > 0) {
+            // Wrong face recognized
+            display.showAccessDenied();
+            led.alarmSignal();
+        } else {
+            // No face detected
+            display.showScanning();
+        }
+    }
+};
+
+LED led;
+Display display;
+FacialRecognition faceRec;
+
+void setup() {
+    // Initialize LCD
+    lcd.begin(16, 2);
+
+    // Initialize serial communication
+    Serial.begin(115200);
+    espSerial.begin(115200);
+
+    // Initialize LED pin
+    pinMode(ledPin, OUTPUT);
+
+    // Display initial message
+    display.showScanning();
+}
+
+void loop() {
+    // Check if data is available from ESP32
+    if (espSerial.available()) {
+        // Read the face ID from ESP32
+        int faceID = espSerial.parseInt();
+
+        // Process the face ID
+        faceRec.processFace(faceID, display, led);
+    }
+}
